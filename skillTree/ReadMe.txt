@@ -1,0 +1,1 @@
+This assignment was for a "skill tree" application for a data structures class, the purpose of which was to evaluate our handiness with recursion, templates and trees.  Of course there are plenty of issues with C++ templates that make it somewhat problematic but still came in handy in this case.

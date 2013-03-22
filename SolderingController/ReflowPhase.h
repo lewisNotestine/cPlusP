@@ -14,6 +14,8 @@ public:
 	//ctors
 	ReflowPhase();
 	ReflowPhase(const char*& phaseName, const Phase& order, const double& duration, const double& targetTemp); 
+	ReflowPhase(const Phase& order, const double& duration, const double& targetTemp);
+	ReflowPhase(const Phase& order);
 	ReflowPhase(const ReflowPhase& otherPhase);
 	~ReflowPhase();
 
@@ -29,12 +31,15 @@ public:
 	void setTargetTemp(const double& temp);
 	const double getTargetTemp() const;
 
-private:
-	char* 	phaseName_;
-	int		phaseOrder_;
-	double	phaseDuration_;
-	double	phaseTemp_;
+	const char* toString() const;
 
+private:
+	char* 					phaseName_;
+	ReflowPhase::Phase		phaseOrder_;
+	double					phaseDuration_;
+	double					phaseTemp_;
+
+	void setOrderName(const Phase& order);
 };
 
 #endif

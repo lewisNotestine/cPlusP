@@ -50,7 +50,7 @@ void setup() {
   
   Serial.println("Here is your profile:");
   for (int i = 0; i < COOLDOWN; i++) {
-    Serial.println("
+    Serial.println("test");
   }
   
 }

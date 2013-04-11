@@ -1,58 +1,60 @@
 #include "ReflowPhase.h"
+#include "Arduino.h"
+//#include <iostream>
+//#include <iomanip>
+
+using namespace std;
 
 ReflowPhase::ReflowPhase() {
 }
 
 
-
-ReflowPhase::ReflowPhase(const char*& phaseName, const Phase& order, const double& duration, const double& targetTemp) :
+ReflowPhase::ReflowPhase(char*& phaseName, const Phase& order, const double& duration, const double& targetTemp) :
 	phaseName_(phaseName),
 	phaseOrder_(order),
 	phaseDuration_(duration),
 	phaseTemp_(targetTemp)
 {}
 
-ReflowPhase(const ReflowPhase::Phase& order, const double& duration, const double& targetTemp) :	
-	phaseOrder_(order),
-	phaseDuration_(duration),
-	phaseTemp_(targetTemp)
-{
-	this->setOrderName(order);
+ReflowPhase::ReflowPhase(Phase& order, const double& duration, const double& targetTemp) {
+    
 }
+
 
 //this is what will most likely be used. 
-ReflowPhase(const ReflowPhase::Phase& order) :	
-	phaseOrder_(order),
+ReflowPhase::ReflowPhase(Phase& order) : phaseOrder_(order) {
+    this->setOrderName(order);
+    this->setDuration(0);
+    this->setTargetTemp(0);
+}
+
+
+ReflowPhase::ReflowPhase(ReflowPhase& otherPhase) :
+    phaseOrder_(otherPhase.getPhaseOrder()),
+    phaseName_((char*)otherPhase.getPhaseName()),
+    phaseDuration_(otherPhase.getDuration()),
+    phaseTemp_(otherPhase.getTargetTemp())
 {
-	this->setOrderName(order);
-	this->setDuration(0);
-	this->setTargetTemp(0);
+    
 }
 
-
-
-ReflowPhase(const ReflowPhase& otherPhase) {
-	this->setPhaseName(otherPhase.getPhaseName());
-	this->setPhaseOrder(otherPhase.getPhaseOrder());
-	this->setDuration(otherPhase.getDuration());
-	this->setTargetTemp(otherPhase.getTargetTemp());
-}
+ReflowPhase::~ReflowPhase() {}
 
 void ReflowPhase::setPhaseName(const char*& phaseName) {
-	this->phaseName_ = phaseName;
+	this->phaseName_ = (char*)phaseName;
 	return;
 }
 
-const char*& ReflowPhase::getPhaseName() const {
-	return this->phaseName_;
+char*& ReflowPhase::getPhaseName() {
+    return this->phaseName_;
 }
 
-void ReflowPhase::setPhaseOrder(const int& order) {
+void ReflowPhase::setPhaseOrder(const Phase& order) {
 	this->phaseOrder_ = order;
 	return;
 }
 
-const int ReflowPhase::getPhaseOrder() const {
+ReflowPhase::Phase ReflowPhase::getPhaseOrder() const {
 	return this->phaseOrder_;
 }
 
@@ -61,7 +63,7 @@ void ReflowPhase::setDuration(const double& duration) {
 	return;
 }
 
-const double ReflowPhase::getDuration() const {
+double ReflowPhase::getDuration() const {
 	return this->phaseDuration_;
 }
 
@@ -70,33 +72,48 @@ void ReflowPhase::setTargetTemp(const double& temp) {
 	return;
 }
 
-const double ReflowPhase::getTargetTemp() const {
+double ReflowPhase::getTargetTemp() const {
 	return this->phaseTemp_;
 }
 
-const char* toString() const {
-	char* retVal[60];
-	snprintf( retVal, sizeof(retVal), "%s:, Duration: %d, Target Temp: %d", this->getPhaseName(), this->getDuration(), this->getTargetTemp());
+char* ReflowPhase::toString() {
+	char* retVal = new char;
+    strcpy(retVal, "Phase: ");
+    char* strDurationTemp = new char;
+    int n;
+    strcat(retVal, this->getPhaseName());
+
+    n = sprintf(strDurationTemp, ", Duration: %4.2f, Temperature: %4.2f \n", this->getDuration(), this->getTargetTemp());
+    
+    strcat(retVal, strDurationTemp);
+
+           
+	//snprintf( retVal, sizeof(retVal), "%s:, Duration: %d, Target Temp: %d", this->getPhaseName(), this->getDuration(), this->getTargetTemp());
 	
+    //delete [] strDurationTemp;
+    
 	return retVal;
 }
 
-void setOrderName(const ReflowPhase::Phase& order) {
-	switch (order) {
-		case PREHEAT:
-			setPhaseName("preheat");
+void ReflowPhase::setOrderName(const ReflowPhase::Phase& order) {
+    const char* theName;
+    
+    switch (order) {
+		case ReflowPhase::PREHEAT:
+            theName = "preheat";
 			break;
 		case SOAK:
-			setPhaseName("soak");
+			theName = "soak";
 			break;
 		case REFLOW:
-			setPhaseName("reflow");
+            theName = "reflow";
 			break;
 		case COOLDOWN:
-			setPhaseName("cooldown");
+			theName = "cooldown";
 			break;
 		default:
-			setPhaseName("error!");
+			theName = "error";
 			break;
 	}
+    setPhaseName(theName);
 }

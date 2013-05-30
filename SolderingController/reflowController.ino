@@ -1,10 +1,13 @@
 /*
 Adapted from Adafruit Max31855 breakout board code.
 
-controls a heat gun based on thermocouple reading. Trying different algorithms, like simple on/off and temperature control reading versus PID algorithm.
+controls a heat gun based on thermocouple reading. 
+Trying different algorithms, like simple on/off and temperature control reading versus PID algorithm.
+
 */
 
 #include "Adafruit_MAX31855.h"
+#include "PID_v1.h"
 
 int thermoDO = 3;
 int thermoCS = 4;
@@ -13,25 +16,33 @@ const int gunPin = 11;
 
 
 int phaseIndex = 0;  //current state of the reflow.
+int windowSize = 1000;
 
 //Times are given as t (not period).
 
 
 const double TEMP_THRESHOLD = 2.0;
-const double PREHEAT_TIME = 470;
-const double PREHEAT_TEMP = 125;
+const double PREHEAT_TIME = 30; //470;
+const double PREHEAT_TEMP = 40;  //125;
 
-const double SOAK_TIME = 575;
-const double SOAK_TEMP = 160;
+const double SOAK_TIME = 60; //575;
+const double SOAK_TEMP = 60;  //160;
 
-const double REFLOW_TIME = 675;
-const double REFLOW_TEMP = 210;
+const double REFLOW_TIME = 90; //675;
+const double REFLOW_TEMP = 80;     //210;
 
-const double COOLDOWN_TIME = 800;
-const double COOLDOWN_TEMP = 160;
+const double COOLDOWN_TIME = 120;   //800;
+const double COOLDOWN_TEMP = 60;   //160;
 const int SECONDS = 120;
 
-double secondsArray[SECONDS];
+
+//Define PID Variables 
+double pidSetpoint, pidInput, pidOutput;
+
+//PID controller.
+PID myPID(&pidInput, &pidOutput, &pidSetpoint,2,5,1, DIRECT);
+
+//double secondsArray[SECONDS];
 double timeArray[4];
 double tempArray[4];
 double dTdtArray[4];
@@ -98,33 +109,6 @@ void setup() {
   int currentPhase = 0;
   double rate = dTdtArray[currentPhase];
   
-  //populate target temp for each second.
-  for (int i = 0; i < SECONDS; i++) {
-   
-    if (i > timeArray[currentPhase]) {
-      currentPhase++;
-      rate = dTdtArray[currentPhase];
-    }
-    
-    if (i == 0) {
-      secondsArray[i] = initTemp;
-    } else {
-      secondsArray[i] = secondsArray[i - 1] + dTdtArray[currentPhase];
-    }
-    
-    Serial.print("Phase: ");
-    Serial.print(nameArray[currentPhase]);
-    Serial.print("; "); 
-    Serial.print("rate: ");
-    Serial.print(rate);
-    Serial.print("; "); 
-    Serial.print("t = ");
-    Serial.print(i);
-    Serial.print("; "); 
-    Serial.print("Target Temp: ");
-    Serial.println(secondsArray[i]);
-  }
-  
   delay(1000);
   
   Serial.println("Testing gun");
@@ -167,12 +151,12 @@ void loop() {
      totalTime += 1.0;
      
    } else {
-     
+     pidInput = c;
      
      //calculate, print the phase.
-     if(phaseTime >= timeArray[phaseIndex]) {
+     if(totalTime >= timeArray[phaseIndex]) {
        phaseIndex++;
-       //phaseTime = 0;
+       phaseTime = 0;
      }
      
      Serial.print(nameArray[phaseIndex]);
@@ -186,13 +170,17 @@ void loop() {
      dTdt = (c - lastTemp);
      int intTime = totalTime;     
      //calculate and print the target temperature.
-     /*
-     if (phaseIndex == 0) {
-       targetTemp =  initTemp + (phaseTime / timeArray[phaseIndex]) * tempArray[phaseIndex];
+     
+     //slope-intercept temp plotting
+     if (phaseIndex == 0 && phaseTime == 0) {
+       //targetTemp = dTdtArray[phaseIndex] * phaseTime + (initTemp);
+       targetTemp = initTemp + dTdtArray[phaseIndex];
      } else {
-       targetTemp =  tempArray[phaseIndex - 1] + (phaseTime / timeArray[phaseIndex]) * tempArray[phaseIndex];
-     }*/
-     targetTemp = secondsArray[intTime];
+       //targetTemp = dTdtArray[phaseIndex] * phaseTime + (tempArray[phaseIndex - 1]);
+       targetTemp += dTdtArray[phaseIndex];
+     }
+
+     //targetTemp = secondsArray[intTime];
      
      Serial.print("Target Temp = C ");
      Serial.print(targetTemp);
@@ -216,21 +204,22 @@ void loop() {
        gunIsOn = false;
      }
      */
+     /*
 
      if (c < secondsArray[intTime]) {
        gunIsOn = true;
      } else {
        gunIsOn = false;
      }
+     */
      
-     
-     //if (c - targetTemp >= TEMP_THRESHOLD) { //Too hot.
+     if (c - targetTemp >= TEMP_THRESHOLD) { //Too hot.
      //if (c > targetTemp) {
-       //gunIsOn = false;
-     //} else if (targetTemp - c >= TEMP_THRESHOLD) {//Too cold
+       gunIsOn = false;
+     } else if (targetTemp - c >= TEMP_THRESHOLD) {//Too cold
      //} else { 
-       //gunIsOn = true;
-     //}
+       gunIsOn = true;
+     }
      
      //toggle heat.
      if (gunIsOn) {
@@ -249,7 +238,8 @@ void loop() {
    }
    //Serial.print("F = ");
    //Serial.println(thermocouple.readFarenheit());
-   } else {
+   
+   } else { //sequence is finished, don't turn on the gun again.
      digitalWrite(gunPin, LOW);
    }
    

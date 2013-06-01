@@ -17,13 +17,14 @@ const int thermoCLK = 5;
 
 //Times are given as t (not period).
 const double TEMP_THRESHOLD = 2.0;
-const double PREHEAT_TIME = 30; //470;
-const double PREHEAT_TEMP = 40;  //125;
 
-const double SOAK_TIME = 60; //575;
+const double PREHEAT_TIME = 120; //470;
+const double PREHEAT_TEMP = 80;  //125;
+
+const double SOAK_TIME = 40; //575;
 const double SOAK_TEMP = 60;  //160;
 
-const double REFLOW_TIME = 90; //675;
+const double REFLOW_TIME = 60; //675;
 const double REFLOW_TEMP = 80;     //210;
 
 const double COOLDOWN_TIME = 120;   //800;
@@ -36,7 +37,9 @@ int             phaseIndex = 0;  //current state of the reflow.
 int             windowSize = 200;
 unsigned long   windowStartTime;
 unsigned long   currentSecs;
+unsigned long   currentMils;
 unsigned long   startTime;
+unsigned long   lastTime;
 double          timeArray[4];
 double          tempArray[4];
 double          dTdtArray[4];
@@ -47,6 +50,7 @@ double          totalTime = 0.0;
 double          targetTemp;  //current target temperature.
 double          initTemp = 0;
 double          lastTemp = 0;
+
 bool            gunIsOn = false;
 bool            printed;
 int             lastPrinted;
@@ -55,7 +59,10 @@ int             lastPrinted;
 double pidSetpoint, pidInput, pidOutput;
 
 //PID controller.
-PID myPID(&pidInput, &pidOutput, &pidSetpoint, 20, 1, 20, DIRECT);
+PID myPID(&pidInput, &pidOutput, &pidSetpoint, 50, 25, 50, DIRECT);
+//PID soakPID(&pidInput, &pidOutput, &pidSetpoint, 20, 1, 20, DIRECT);
+//PID reflowPID(&pidInput, &pidOutput, &pidSetpoint, 20, 1, 20, DIRECT);
+//PID cooldownPID(&pidInput, &pidOutput, &pidSetpoint, 20, 1, 20, DIRECT);
 
 //thermocouple.
 Adafruit_MAX31855 thermocouple(thermoCLK, thermoCS, thermoDO);
@@ -143,17 +150,16 @@ void setup() {
   
   windowStartTime = millis();
   startTime = windowStartTime;
-  pidSetpoint = 40.0;
-
+  //pidSetpoint = 40.0;
+  pidSetpoint = dTdtArray[0];
 }
 
 void loop() {
 
-  // basic readout test, just print the current temp
-   //Serial.print("Internal Temp = " );
-   //Serial.println(thermocouple.readInternal());
+   double dT;
+   double dt;
    
-   double dTdt;    //rate of temp change current.
+   double dTdt = 0;    //rate of temp change current.
    double c = thermocouple.readCelsius();
    
   if (isnan(c)) {
@@ -162,46 +168,80 @@ void loop() {
     totalTime += 1.0;
      
   } else {
-    //set the PID input.
-    pidInput = c;
+
 
     //set the PID setpoint.
     //get current time in milliseconds, interpolate from current phase. 
+    currentMils = (millis() - startTime);
     currentSecs = (millis() - startTime) / 1000;
-    //increment phaseIndex if necessary.
+
+    //increment phaseIndex, change setPoint if necessary.
     if (currentSecs >= timeArray[phaseIndex]) {
       phaseIndex++;
+      pidSetpoint = dTdtArray[phaseIndex];
     }
 
-    /*if (phaseIndex == 0) {
+    //calculate, set the PID input.
+    if (phaseIndex == 0) {
       targetTemp = (currentSecs * dTdtArray[phaseIndex]) + initTemp;
     } else {
       targetTemp = ((currentSecs - timeArray[phaseIndex - 1]) * dTdtArray[phaseIndex]) + tempArray[phaseIndex - 1];
-    }*/
-    
-    //pidSetpoint = targetTemp;
+    }
+
+
+    dT = c - initTemp;
+    dt = (currentMils - startTime) / 1000.0;
+
+    //dT = c - lastTemp;
+    //dt = (currentMils - lastTime) / 1000.0;
+
+    if (dt != 0) {
+      dTdt = dT / dt;
+      /*if (dTdt == -1) {
+        dTdt = dT / dt;  //initialize the measurement.
+      } else {
+        dTdt = (dTdt + (dT / dt))/ 2.0; //use a moving average to get rid of noise or bias.
+      }*/
+      
+    } else {
+      dTdt = 0;
+    }
+
+    Serial.print("dT: ");
+    Serial.print(dT);
+
+    Serial.print("; dt: ");
+    Serial.println(dt);
+
+    Serial.print("Target dTdt: ");
+    Serial.print(dTdtArray[phaseIndex]);
+    Serial.print("; ");
+
+    Serial.print("dTdt: ");
+    Serial.print(dTdt);
+    //Serial.print(c - targetTemp);
+    Serial.print("; ");
+
+    Serial.print("Target Temp = C ");
+    Serial.print(targetTemp);
+    Serial.print("; ");
+
+    //print the observed temperature.
+    Serial.print("Current Temp = C "); 
+    Serial.print(c);
+    Serial.print("; ");
+
+    pidInput = dTdt;
 
     //Compute.
     myPID.Compute();
-
-
 
     //turn gun on or off based on PID output.
     if(millis() - windowStartTime > windowSize) { //time to shift the Relay Window
       windowStartTime += windowSize;
     }
     
-    /*
-    if (c < targetTemp) {
-      digitalWrite(gunPin,HIGH);
-      gunIsOn = true;
-    } else if (c > targetTemp) {
-      digitalWrite(gunPin,LOW);
-      gunIsOn = false;
-    }
-    */
-    
-    /* PID control doesn't seem to work very well.*/
+    /* PID control*/
 
     if(pidOutput > millis() - windowStartTime) {
       digitalWrite(gunPin,HIGH);
@@ -210,13 +250,15 @@ void loop() {
       digitalWrite(gunPin,LOW);
       gunIsOn = false;
     }
-    
-
 
     printed = (currentSecs == lastPrinted);
 
-    //print everything every second.
+    //print everything every second, also reset the dTdt comparanda.
     if (!printed) {
+      
+      /*
+
+
       Serial.print("pidOutput= ");
       Serial.print(pidOutput);
       
@@ -230,14 +272,14 @@ void loop() {
       Serial.print(nameArray[phaseIndex]);
       Serial.print("; ");
       
-      /*
+    
       Serial.print("Phase Time: ");
       Serial.print(phaseTime);
       Serial.print("; ");
-      */
+      
 
       Serial.print("Target Temp = C ");
-      Serial.print(pidSetpoint);
+      Serial.print(targetTemp);
       Serial.print("; ");
 
       //print the observed temperature.
@@ -245,12 +287,20 @@ void loop() {
       Serial.print(c);
       Serial.print("; ");
 
-      Serial.print("dT: ");
+      Serial.print("Target dt: ");
+      Serial.print(dTdtArray[phaseIndex]);
+      Serial.print("; ");
+
+      Serial.print("dTdt: ");
       Serial.print(dTdt);
       //Serial.print(c - targetTemp);
       Serial.print("; ");
 
       Serial.println(gunIsOn);
+      */
+
+      lastTemp = c;
+      lastTime = currentMils;
       lastPrinted = currentSecs;
     }
   }

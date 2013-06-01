@@ -59,7 +59,7 @@ int             lastPrinted;
 double pidSetpoint, pidInput, pidOutput;
 
 //PID controller.
-PID myPID(&pidInput, &pidOutput, &pidSetpoint, 50, 25, 50, DIRECT);
+PID myPID(&pidInput, &pidOutput, &pidSetpoint, 50, 10, 50, DIRECT);
 //PID soakPID(&pidInput, &pidOutput, &pidSetpoint, 20, 1, 20, DIRECT);
 //PID reflowPID(&pidInput, &pidOutput, &pidSetpoint, 20, 1, 20, DIRECT);
 //PID cooldownPID(&pidInput, &pidOutput, &pidSetpoint, 20, 1, 20, DIRECT);
@@ -188,8 +188,8 @@ void loop() {
       targetTemp = ((currentSecs - timeArray[phaseIndex - 1]) * dTdtArray[phaseIndex]) + tempArray[phaseIndex - 1];
     }
 
-
-    dT = c - initTemp;
+    /*changing these to update every second*/
+    /*dT = c - initTemp;
     dt = (currentMils - startTime) / 1000.0;
 
     //dT = c - lastTemp;
@@ -201,38 +201,13 @@ void loop() {
         dTdt = dT / dt;  //initialize the measurement.
       } else {
         dTdt = (dTdt + (dT / dt))/ 2.0; //use a moving average to get rid of noise or bias.
-      }*/
+      }
       
     } else {
       dTdt = 0;
-    }
+    }*/
 
-    Serial.print("dT: ");
-    Serial.print(dT);
-
-    Serial.print("; dt: ");
-    Serial.println(dt);
-
-    Serial.print("Target dTdt: ");
-    Serial.print(dTdtArray[phaseIndex]);
-    Serial.print("; ");
-
-    Serial.print("dTdt: ");
-    Serial.print(dTdt);
-    //Serial.print(c - targetTemp);
-    Serial.print("; ");
-
-    Serial.print("Target Temp = C ");
-    Serial.print(targetTemp);
-    Serial.print("; ");
-
-    //print the observed temperature.
-    Serial.print("Current Temp = C "); 
-    Serial.print(c);
-    Serial.print("; ");
-
-    pidInput = dTdt;
-
+    
     //Compute.
     myPID.Compute();
 
@@ -255,53 +230,60 @@ void loop() {
 
     //print everything every second, also reset the dTdt comparanda.
     if (!printed) {
-      
-      /*
+          dT = c - lastTemp;
+          dt = (currentMils - lastTime) / 1000.0;
 
+          //dT = c - lastTemp;
+          //dt = (currentMils - lastTime) / 1000.0;
 
-      Serial.print("pidOutput= ");
-      Serial.print(pidOutput);
-      
-      Serial.print("; time window= ");
-      Serial.print(millis() - windowStartTime);
-      Serial.print("; ");
-      Serial.print("t = ");
-      Serial.print(currentSecs);
-      Serial.print("; ");
+          if (dt != 0) {
+            dTdt = dT / dt;
+            /*if (dTdt == -1) {
+              dTdt = dT / dt;  //initialize the measurement.
+            } else {
+              dTdt = (dTdt + (dT / dt))/ 2.0; //use a moving average to get rid of noise or bias.
+            }*/
+            
+          } else {
+            dTdt = 0;
+          }
 
-      Serial.print(nameArray[phaseIndex]);
-      Serial.print("; ");
-      
-    
-      Serial.print("Phase Time: ");
-      Serial.print(phaseTime);
-      Serial.print("; ");
-      
-
-      Serial.print("Target Temp = C ");
-      Serial.print(targetTemp);
-      Serial.print("; ");
-
-      //print the observed temperature.
-      Serial.print("Current Temp = C "); 
-      Serial.print(c);
-      Serial.print("; ");
-
-      Serial.print("Target dt: ");
-      Serial.print(dTdtArray[phaseIndex]);
-      Serial.print("; ");
-
-      Serial.print("dTdt: ");
-      Serial.print(dTdt);
-      //Serial.print(c - targetTemp);
-      Serial.print("; ");
-
-      Serial.println(gunIsOn);
-      */
+          pidInput = dTdt;
 
       lastTemp = c;
       lastTime = currentMils;
       lastPrinted = currentSecs;
     }
+
+    Serial.print("pid OUTPUT: ");
+    Serial.print(pidOutput);
+    Serial.print("; ");
+
+    Serial.print("dT: ");
+    Serial.print(dT);
+
+    Serial.print("; dt: ");
+    Serial.println(dt);
+
+    Serial.print("Target dTdt: ");
+    Serial.print(dTdtArray[phaseIndex]);
+    Serial.print("; ");
+
+    Serial.print("dTdt: ");
+    Serial.print(pidInput);
+    //Serial.print(c - targetTemp);
+    Serial.print("; ");
+
+    Serial.print("Target Temp = C ");
+    Serial.print(targetTemp);
+    Serial.print("; ");
+
+    //print the observed temperature.
+    Serial.print("Current Temp = C "); 
+    Serial.print(c);
+    Serial.print("; ");
+
+    //pidInput = dTdt;
+
   }
 }
